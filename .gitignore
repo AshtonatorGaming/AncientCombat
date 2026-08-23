@@ -1,0 +1,53 @@
+# Gradle
+.gradle/
+build/
+out/
+bin/
+
+# Forge / run dirs (client-server test worlds)
+run/
+runs/
+logs/
+
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Java / misc
+*.class
+*.jar
+*.war
+*.log
+*.tmp
+hs_err_pid*
+
+# Don't commit local secrets if you ever add any
+*.pem
+.env
+
+# IDE / AI agent
+.junie/
+.cursor/
+*.md.bak
+
+# Local dependency jars (use Maven/FlatDir locally; do not publish private AW)
+libs/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
