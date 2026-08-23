@@ -11,56 +11,41 @@ import net.minecraft.world.entity.Mob;
 import net.shadowmage.ancientwarfare.npc.ai.NpcAIAttackMeleeLongRange;
 import net.shadowmage.ancientwarfare.npc.entity.NpcBase;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.lang.reflect.Field;
-
 @Mixin(NpcAIAttackMeleeLongRange.class)
 public abstract class NpcAIAttackMeleeLongRangeMixin {
 
-    private static final float MAX_YAW_ERROR = 30.0F;
-    private static final float MAX_YAW_ERROR_CLOSE = 60.0F;
-    private static final float MAX_YAW_ERROR_SMALL = 40.0F;
-    private static final float BODY_TURN_SPEED = 16.0F;
+    @Unique
+    private int ancientCombat$inRangeTicks;
 
     @Inject(method = "doAttack", at = @At("HEAD"), cancellable = true, remap = false)
     private void ancientCombat$doAttack(double distanceToEntity, CallbackInfo ci) {
-        NpcAIAttackMeleeLongRange self = (NpcAIAttackMeleeLongRange) (Object) this;
-        NpcBase npc = ancientCombat$getNpc(self);
-        if (npc == null) {
-            return;
-        }
+        if (!CompatConfig.ENABLE_BC_MELEE.get()) return;
 
-        // Fists / non-BC: do nothing. AW runs full doAttack (anim + hurt + getCoolDown).
-        if (!BcWeapon.hasCompatibleWeapon(npc)) {
+        NpcAIAttackMeleeLongRange self = (NpcAIAttackMeleeLongRange) (Object) this;
+        NpcBase npc = ((AccessorNpcAI) this).ancientcombat$getNpc();
+        if (npc == null) return;
+
+        if (!BcWeapon.hasCompatibleWeapon(npc)) return;
+
+        if (BcWeapon.shouldHoldRange(npc) && !CompatConfig.BC_MELEE_ON_THROWABLE_IN_RANGE.get()) {
             return;
         }
 
         WeaponAttributes attributes = BcWeapon.getAttributes(npc);
-        if (attributes == null) {
-            return;
-        }
+        if (attributes == null) return;
 
-        // BC weapon only: replace entire AW attack this tick
         ci.cancel();
 
         Mob mob = (Mob) npc;
         LivingEntity target = self.getTarget();
         if (target == null || !target.isAlive()) {
-            return;
-        }
-
-        ancientCombat$faceTarget(npc, target);
-
-        if (self.getAttackDelay() > 0) {
-            return;
-        }
-
-        if (!MobCombatHelper.isAttackReady(mob)) {
-            self.setAttackDelay(1);
+            ancientCombat$inRangeTicks = 0;
             return;
         }
 
@@ -68,45 +53,67 @@ public abstract class NpcAIAttackMeleeLongRangeMixin {
         double reach = ancientCombat$effectiveReach(npc, attributes);
         double maxDist = ancientCombat$bodyRadius(npc) + ancientCombat$bodyRadius(target) + reach;
 
-        if (dist > maxDist) {
+        // Face every attack tick while we have a target (body-oriented BC hitboxes)
+        ancientCombat$faceTarget(npc, target, dist < maxDist * 1.25);
+
+        if (self.getAttackDelay() > 0) return;
+
+        if (!MobCombatHelper.isAttackReady(mob)) {
             self.setAttackDelay(1);
             return;
         }
 
-        float yawLimit = ancientCombat$yawLimit(npc, dist, maxDist);
-        if (!ancientCombat$isFacingTarget(npc, target, yawLimit)) {
+        if (dist > maxDist) {
+            ancientCombat$inRangeTicks = 0;
+            self.setAttackDelay(1);
+            return;
+        }
+
+        ancientCombat$inRangeTicks++;
+
+        double yawErr = dist < maxDist * 0.5
+                ? CompatConfig.MAX_YAW_ERROR_CLOSE.get()
+                : CompatConfig.MAX_YAW_ERROR.get();
+        float yawLimit = (float) yawErr;
+
+        boolean facing = ancientCombat$isBodyFacingTarget(npc, target, yawLimit);
+        int forceAfter = CompatConfig.FORCE_SWING_TICKS.get();
+        if (!facing && (forceAfter <= 0 || ancientCombat$inRangeTicks < forceAfter)) {
             self.setAttackDelay(1);
             return;
         }
 
         ((MobAttackWindup) mob).bettermobcombat$startUpswing(attributes, null);
         self.setAttackDelay(1);
+        ancientCombat$inRangeTicks = 0;
     }
 
     @Inject(method = "shouldCloseOnTarget", at = @At("HEAD"), cancellable = true, remap = false)
     private void ancientCombat$shouldClose(double distanceToEntitySq, CallbackInfoReturnable<Boolean> cir) {
         NpcAIAttackMeleeLongRange self = (NpcAIAttackMeleeLongRange) (Object) this;
-        NpcBase npc = ancientCombat$getNpc(self);
-        if (npc == null) {
-            return;
-        }
-
-        if (!BcWeapon.hasCompatibleWeapon(npc)) {
-            return;
-        }
-
-        WeaponAttributes attributes = BcWeapon.getAttributes(npc);
-        if (attributes == null) {
-            return;
-        }
+        NpcBase npc = ((AccessorNpcAI) this).ancientcombat$getNpc();
+        if (npc == null) return;
 
         LivingEntity target = self.getTarget();
+        if (target != null && target.isAlive()) {
+            ancientCombat$faceTarget(npc, target, false);
+        }
+
+        if (CompatConfig.HOLD_RANGE_FOR_THROWABLES.get() && BcWeapon.shouldHoldRange(npc)) {
+            cir.setReturnValue(false);
+            return;
+        }
+
+        if (!CompatConfig.ENABLE_BC_CLOSER.get()) return;
+        if (!BcWeapon.hasCompatibleWeapon(npc)) return;
+
+        WeaponAttributes attributes = BcWeapon.getAttributes(npc);
+        if (attributes == null) return;
+
         if (target == null) {
             cir.setReturnValue(true);
             return;
         }
-
-        ancientCombat$faceTarget(npc, target);
 
         double reach = ancientCombat$effectiveReach(npc, attributes);
         double factor = ancientCombat$closeFactor(npc);
@@ -120,9 +127,7 @@ public abstract class NpcAIAttackMeleeLongRangeMixin {
 
     private static double ancientCombat$effectiveReach(NpcBase npc, WeaponAttributes attributes) {
         double r = attributes.attackRange();
-        if (r <= 0.1) {
-            r = 1.75;
-        }
+        if (r <= 0.1) r = 1.75;
 
         float h = npc.getBbHeight();
         float w = npc.getBbWidth();
@@ -146,26 +151,12 @@ public abstract class NpcAIAttackMeleeLongRangeMixin {
 
     private static double ancientCombat$closeFactor(NpcBase npc) {
         float h = npc.getBbHeight();
-        if (h <= CompatConfig.TINY_HEIGHT.get()) {
-            return CompatConfig.CLOSE_FACTOR_TINY.get();
-        }
-        if (h <= CompatConfig.SMALL_HEIGHT.get()) {
-            return CompatConfig.CLOSE_FACTOR_SMALL.get();
-        }
+        if (h <= CompatConfig.TINY_HEIGHT.get()) return CompatConfig.CLOSE_FACTOR_TINY.get();
+        if (h <= CompatConfig.SMALL_HEIGHT.get()) return CompatConfig.CLOSE_FACTOR_SMALL.get();
         return CompatConfig.CLOSE_FACTOR_NORMAL.get();
     }
 
-    private static float ancientCombat$yawLimit(NpcBase npc, double dist, double maxDist) {
-        if (dist < maxDist * 0.5) {
-            return MAX_YAW_ERROR_CLOSE;
-        }
-        if (npc.getBbHeight() <= CompatConfig.SMALL_HEIGHT.get()) {
-            return MAX_YAW_ERROR_SMALL;
-        }
-        return MAX_YAW_ERROR;
-    }
-
-    private static void ancientCombat$faceTarget(NpcBase npc, LivingEntity target) {
+    private static void ancientCombat$faceTarget(NpcBase npc, LivingEntity target, boolean aggressive) {
         double tx = target.getX();
         double ty = target.getY() + target.getBbHeight() * 0.5;
         double tz = target.getZ();
@@ -176,35 +167,21 @@ public abstract class NpcAIAttackMeleeLongRangeMixin {
         double dz = tz - npc.getZ();
         float desiredYaw = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI) - 90.0);
         float delta = Mth.wrapDegrees(desiredYaw - npc.getYRot());
-        float step = Mth.clamp(delta, -BODY_TURN_SPEED, BODY_TURN_SPEED);
+
+        float maxStep = (float) CompatConfig.BODY_TURN_SPEED.get().doubleValue();
+        if (aggressive) maxStep *= 1.5F;
+
+        float step = Mth.clamp(delta, -maxStep, maxStep);
         npc.setYRot(npc.getYRot() + step);
         npc.yBodyRot = npc.getYRot();
+        npc.yHeadRot = npc.getYRot();
     }
 
-    private static boolean ancientCombat$isFacingTarget(NpcBase npc, LivingEntity target, float maxYawError) {
+    /** Body yaw drives BC hitbox orientation. */
+    private static boolean ancientCombat$isBodyFacingTarget(NpcBase npc, LivingEntity target, float maxYawError) {
         double dx = target.getX() - npc.getX();
         double dz = target.getZ() - npc.getZ();
         float desiredYaw = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI) - 90.0);
-        return Math.abs(Mth.wrapDegrees(npc.yHeadRot - desiredYaw)) <= maxYawError;
-    }
-
-    private static NpcBase ancientCombat$getNpc(NpcAIAttackMeleeLongRange self) {
-        try {
-            Class<?> c = self.getClass();
-            while (c != null) {
-                try {
-                    Field f = c.getDeclaredField("npc");
-                    f.setAccessible(true);
-                    Object v = f.get(self);
-                    if (v instanceof NpcBase) {
-                        return (NpcBase) v;
-                    }
-                } catch (NoSuchFieldException ignored) {
-                }
-                c = c.getSuperclass();
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
+        return Math.abs(Mth.wrapDegrees(npc.yBodyRot - desiredYaw)) <= maxYawError;
     }
 }

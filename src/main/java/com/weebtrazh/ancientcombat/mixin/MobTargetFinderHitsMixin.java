@@ -1,5 +1,6 @@
 package com.weebtrazh.ancientcombat.mixin;
 
+import com.weebtrazh.ancientcombat.CompatConfig;
 import me.Thelnfamous1.bettermobcombat.logic.MobTargetFinder;
 import net.bettercombat.api.WeaponAttributes;
 import net.minecraft.world.entity.Entity;
@@ -17,11 +18,8 @@ import java.util.List;
 @Mixin(value = MobTargetFinder.class, remap = false)
 public class MobTargetFinderHitsMixin {
 
-    private static final float TALL_HEIGHT = 2.4F;
-    private static final float WIDE_WIDTH = 1.2F;
-
     @Inject(method = "findAttackTargets", at = @At("RETURN"), cancellable = true, remap = false)
-    private static void awBetterCombat$forceAiTarget(
+    private static void ancientCombat$forceAiTarget(
             LivingEntity mob,
             Entity intendedTarget,
             WeaponAttributes.Attack attack,
@@ -29,8 +27,10 @@ public class MobTargetFinderHitsMixin {
             CallbackInfoReturnable<List<Entity>> cir
     ) {
         if (!(mob instanceof NpcBase)) return;
-        // Hobbits / small NPCs: leave pure BC hit detection
-        if (mob.getBbHeight() < TALL_HEIGHT && mob.getBbWidth() < WIDE_WIDTH) return;
+        if (mob.getBbHeight() < CompatConfig.TALL_HEIGHT.get()
+                && mob.getBbWidth() < CompatConfig.WIDE_WIDTH.get()) {
+            return;
+        }
 
         Entity target = intendedTarget;
         if (target == null && mob instanceof Mob m) {
