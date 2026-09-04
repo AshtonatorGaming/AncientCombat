@@ -10,46 +10,67 @@ authors="${mod_authors}"
 description='''${mod_description}'''
 
 [[dependencies.ancientcombat]]
-    modId="forge"
-    mandatory=true
-    versionRange="[47,)"
-    ordering="NONE"
-    side="BOTH"
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
 
 [[dependencies.ancientcombat]]
-    modId="minecraft"
-    mandatory=true
-    versionRange="[1.20.1,1.21)"
-    ordering="NONE"
-    side="BOTH"
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
 
 [[dependencies.ancientcombat]]
-    modId="ancientwarfare"
-    mandatory=true
-    versionRange="[1.3,)"
-    ordering="AFTER"
-    side="BOTH"
+modId="ancientwarfare"
+mandatory=true
+versionRange="[1.3,)"
+ordering="AFTER"
+side="BOTH"
 
 [[dependencies.ancientcombat]]
-    modId="bettercombat"
-    mandatory=false
-    versionRange="[1.8,)"
-    ordering="NONE"
-    side="BOTH"
+modId="bettercombat"
+mandatory=false
+versionRange="[1.8,)"
+ordering="NONE"
+side="BOTH"
 
 [[dependencies.ancientcombat]]
-    modId="bettermobcombat"
-    mandatory=false
-    versionRange="[1.2,)"
-    ordering="NONE"
-    side="BOTH"
+modId="bettermobcombat"
+mandatory=false
+versionRange="[1.2,)"
+ordering="NONE"
+side="BOTH"
 
 [[dependencies.ancientcombat]]
-    modId="spartanweaponry"
-    mandatory=false
-    versionRange="[3.0,)"
-    ordering="NONE"
-    side="BOTH"
+modId="spartanweaponry"
+mandatory=false
+versionRange="[3.0,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ancientcombat]]
+modId="entity_model_features"
+mandatory=false
+versionRange="[2.1,)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.ancientcombat]]
+modId="entity_texture_features"
+mandatory=false
+versionRange="*"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.ancientcombat]]
+modId="emf_compat_core"
+mandatory=false
+versionRange="*"
+ordering="NONE"
+side="CLIENT"
 
 [[mixins]]
 config="ancientcombat.mixins.json"

@@ -3,11 +3,18 @@
   "minVersion": "0.8",
   "package": "com.weebtrazh.ancientcombat.mixin",
   "compatibilityLevel": "JAVA_17",
+  "refmap": "ancientcombat.refmap.json",
   "mixins": [
     "AccessorNpcAI",
     "NpcAIAttackMeleeLongRangeMixin",
     "MobTargetFinderMixin",
     "MobTargetFinderHitsMixin"
+  ],
+  "client": [
+    "HumanoidModelNpcMixin",
+    "LivingEntityRendererNpcMixin",
+    "RenderNpcBaseMixin",
+    "ModelNpcMixin"
   ],
   "injectors": {
     "defaultRequire": 1

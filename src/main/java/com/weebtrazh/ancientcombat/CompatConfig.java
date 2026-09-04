@@ -12,6 +12,8 @@ public class CompatConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_POSE_TICK;
     public static final ForgeConfigSpec.IntValue POSE_TICK_INTERVAL;
     public static final ForgeConfigSpec.DoubleValue POSE_SCAN_RADIUS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_EMF_NPC_COMPAT;
+    public static final ForgeConfigSpec.BooleanValue EMF_PAUSE_ARMS_ONLY;
 
     public static final ForgeConfigSpec.DoubleValue BODY_TURN_SPEED;
     public static final ForgeConfigSpec.DoubleValue MAX_YAW_ERROR;
@@ -53,6 +55,12 @@ public class CompatConfig {
         POSE_SCAN_RADIUS = b
                 .comment("Only update poses for NPCs within this distance of the player.")
                 .defineInRange("poseScanRadius", 48.0D, 16.0D, 128.0D);
+        ENABLE_EMF_NPC_COMPAT = b
+                .comment("Client: when EMF is installed, keep FAPE/EMF body and idle on AW NPCs and let Better Combat own combat poses. No effect if EMF is not installed.")
+                .define("enableEmfNpcCompat", true);
+        EMF_PAUSE_ARMS_ONLY = b
+                .comment("If true, try to pause EMF only on arms during a combat pose. If false, pause the whole EMF animation on that NPC while a combat pose is active.")
+                .define("emfPauseArmsOnly", true);
         b.pop();
 
         b.comment("Body facing for BC hitboxes (prevents swinging into empty air)").push("facing");
