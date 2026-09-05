@@ -70,6 +70,7 @@ dependencies {
     compileOnly fg.deobf(fileTree(dir: 'libs', include: ['bmcfix*.jar']))
     compileOnly fg.deobf(fileTree(dir: 'libs', include: ['entity_model_features*.jar']))
     compileOnly fg.deobf(fileTree(dir: 'libs', include: ['SpartanWeaponry*.jar', 'spartanweaponry*.jar']))
+    compileOnly fg.deobf(fileTree(dir: 'libs', include: ['emf_compat*.jar', 'emf-compat*.jar']))
 }
 
 processResources {

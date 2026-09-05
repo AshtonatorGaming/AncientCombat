@@ -5,49 +5,33 @@ import net.bettercombat.logic.WeaponRegistry;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.shadowmage.ancientwarfare.npc.entity.NpcBase;
+import org.joml.Vector3f;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
+import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = AncientCombat.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class FACompatHandler {
 
+    public static final String EMF_COMPAT_SOURCE = "better_combat";
+
     private static boolean resolved;
-    private static boolean emfPresent;
+    private static boolean emfCompatPresent;
     private static Method mpaIsAnimating;
-    private static Method registerPause;
-    private static Method registerVanilla;
-    private static Method registerBoolVar;
-    private static Method getCurrentEntity;
-    private static Method emfEntityOf;
+    private static Method savePoses;
+    private static Method clearPoses;
+    private static Constructor<?> snapshotCtor;
 
-    private static final Map<HumanoidModel<?>, float[]> LAST_POSE = new WeakHashMap<>();
-
-    @SubscribeEvent
-    public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            emfPresent = ModList.get().isLoaded("entity_model_features");
-            resolveHelpers();
-            if (!emfPresent) {
-                AncientCombat.LOGGER.info("EMF not present — AW NPC fancy-body compat skipped");
-                return;
-            }
-            boolean pause = registerPauseCondition();
-            boolean vanilla = registerVanillaCondition();
-            boolean vars = registerAnimatorVars();
-            AncientCombat.LOGGER.info("AW NPC EMF hooks pause={} vanillaLock={} vars={}", pause, vanilla, vars);
-        });
+    public static boolean emfCompatCoreLoaded() {
+        resolve();
+        return emfCompatPresent && savePoses != null;
     }
 
     public static boolean shouldKeepCombatPose(LivingEntity entity) {
@@ -61,15 +45,40 @@ public class FACompatHandler {
         }
         try {
             WeaponAttributes attributes = WeaponRegistry.getAttributes(entity.getMainHandItem());
-            return attributes != null && attributes.pose() != null;
+            if (attributes == null) return false;
+            if (attributes.pose() != null) return true;
+            WeaponAttributes.Attack[] attacks = attributes.attacks();
+            return attacks != null && attacks.length > 0;
         } catch (Throwable ignored) {
             return false;
         }
     }
 
-    public static boolean currentEmfEntityNeedsCombatLock() {
-        Entity e = currentEntity();
-        return e instanceof LivingEntity living && shouldKeepCombatPose(living);
+    public static void captureForEmfCompat(PlayerModel<?> model, LivingEntity entity) {
+        if (!emfCompatCoreLoaded()) return;
+        if (!shouldKeepCombatPose(entity)) {
+            clearEmfCompatPose(entity.getUUID());
+            return;
+        }
+        model.rightSleeve.copyFrom(model.rightArm);
+        model.leftSleeve.copyFrom(model.leftArm);
+        model.jacket.copyFrom(model.body);
+        try {
+            Object left = snapshotCtor.newInstance(model.leftArm);
+            Object right = snapshotCtor.newInstance(model.rightArm);
+            Vector3f bodyBase = new Vector3f(model.body.x, model.body.y, model.body.z);
+            savePoses.invoke(null, entity.getUUID(), EMF_COMPAT_SOURCE, left, right, null, bodyBase);
+        } catch (Throwable t) {
+            AncientCombat.LOGGER.debug("EMF Compat pose save failed: {}", t.toString());
+        }
+    }
+
+    public static void clearEmfCompatPose(UUID uuid) {
+        if (clearPoses == null) return;
+        try {
+            clearPoses.invoke(null, uuid, EMF_COMPAT_SOURCE);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void pauseEmfFor(LivingEntity entity) {
@@ -79,22 +88,10 @@ public class FACompatHandler {
     }
 
     public static void captureHumanoidCombatParts(HumanoidModel<?> human) {
-        LAST_POSE.put(human, new float[]{
-                human.rightArm.xRot, human.rightArm.yRot, human.rightArm.zRot,
-                human.leftArm.xRot, human.leftArm.yRot, human.leftArm.zRot,
-                human.body.xRot, human.body.yRot, human.body.zRot
-        });
     }
 
     public static void restoreHumanoidCombatParts(HumanoidModel<?> human) {
-        float[] p = LAST_POSE.get(human);
-        if (p == null) {
-            captureHumanoidCombatParts(human);
-            p = LAST_POSE.get(human);
-        }
-        apply(human.rightArm, p[0], p[1], p[2]);
-        apply(human.leftArm, p[3], p[4], p[5]);
-        apply(human.body, p[6], p[7], p[8]);
+        if (emfCompatCoreLoaded()) return;
         if (human instanceof PlayerModel<?> player) {
             player.rightSleeve.copyFrom(player.rightArm);
             player.leftSleeve.copyFrom(player.leftArm);
@@ -104,22 +101,7 @@ public class FACompatHandler {
         }
     }
 
-    private static void apply(ModelPart part, float x, float y, float z) {
-        part.xRot = x;
-        part.yRot = y;
-        part.zRot = z;
-    }
-
-    private static Entity currentEntity() {
-        if (getCurrentEntity == null) return null;
-        try {
-            return unwrap(getCurrentEntity.invoke(null));
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static void resolveHelpers() {
+    private static void resolve() {
         if (resolved) return;
         resolved = true;
         try {
@@ -127,90 +109,34 @@ public class FACompatHandler {
             mpaIsAnimating = helper.getMethod("isAnimating", LivingEntity.class);
         } catch (Throwable ignored) {
         }
-        if (!emfPresent) return;
-        try {
-            Class<?> api = Class.forName("traben.entity_model_features.EMFAnimationApi");
-            getCurrentEntity = api.getMethod("getCurrentEntity");
+        emfCompatPresent = ModList.get().isLoaded("emf_compat_core")
+                || ModList.get().isLoaded("emf-compat-core");
+        if (!emfCompatPresent) {
             try {
-                emfEntityOf = api.getMethod("emfEntityOf", Entity.class);
+                Class.forName("strm.emfcompat.core.PoseManager");
+                emfCompatPresent = true;
             } catch (Throwable ignored) {
             }
-            registerPause = api.getMethod("registerPauseCondition", Function.class);
-            registerVanilla = api.getMethod("registerVanillaModelCondition", Function.class);
-            registerBoolVar = api.getMethod(
-                    "registerSingletonAnimationVariable",
-                    String.class, String.class, String.class, BooleanSupplier.class
+        }
+        if (!emfCompatPresent) return;
+        try {
+            Class<?> manager = Class.forName("strm.emfcompat.core.PoseManager");
+            Class<?> snapshot = Class.forName("strm.emfcompat.core.PoseSnapshot");
+            snapshotCtor = snapshot.getConstructor(ModelPart.class);
+            savePoses = manager.getMethod(
+                    "savePoses",
+                    UUID.class,
+                    String.class,
+                    snapshot,
+                    snapshot,
+                    Map.class,
+                    Vector3f.class
             );
+            clearPoses = manager.getMethod("clearPoses", UUID.class, String.class);
+            AncientCombat.LOGGER.info("AW NPCs will reuse EMF Compat Core PoseManager source={}", EMF_COMPAT_SOURCE);
         } catch (Throwable t) {
-            AncientCombat.LOGGER.warn("EMF API resolve failed", t);
+            savePoses = null;
+            AncientCombat.LOGGER.warn("EMF Compat Core present but PoseManager API mismatch: {}", t.toString());
         }
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static boolean registerPauseCondition() {
-        if (registerPause == null) return false;
-        try {
-            Function fn = (Object emfEntity) -> {
-                Entity e = unwrap(emfEntity);
-                return e instanceof LivingEntity living && shouldKeepCombatPose(living);
-            };
-            registerPause.invoke(null, fn);
-            return true;
-        } catch (Throwable t) {
-            AncientCombat.LOGGER.warn("registerPauseCondition failed", t);
-            return false;
-        }
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static boolean registerVanillaCondition() {
-        if (registerVanilla == null) return false;
-        try {
-            Function fn = (Object emfEntity) -> {
-                Entity e = unwrap(emfEntity);
-                return e instanceof LivingEntity living && shouldKeepCombatPose(living);
-            };
-            registerVanilla.invoke(null, fn);
-            return true;
-        } catch (Throwable t) {
-            AncientCombat.LOGGER.warn("registerVanillaModelCondition failed", t);
-            return false;
-        }
-    }
-
-    private static boolean registerAnimatorVars() {
-        if (registerBoolVar == null) return false;
-        BooleanSupplier supplier = FACompatHandler::currentEmfEntityNeedsCombatLock;
-        boolean any = false;
-        any |= registerVar("is_playeranimator_active", supplier);
-        any |= registerVar("is_playeranimator_animation_active", supplier);
-        any |= registerVar("is_mob_playeranimator_active", supplier);
-        return any;
-    }
-
-    private static boolean registerVar(String name, BooleanSupplier supplier) {
-        try {
-            registerBoolVar.invoke(null, AncientCombat.MOD_ID, name, name, supplier);
-            return true;
-        } catch (Throwable t) {
-            AncientCombat.LOGGER.warn("Failed to register EMF var {}", name, t);
-            return false;
-        }
-    }
-
-    private static Entity unwrap(Object emfEntity) {
-        if (emfEntity instanceof Entity e) return e;
-        if (emfEntity == null) return null;
-        try {
-            for (Method m : emfEntity.getClass().getMethods()) {
-                if (m.getParameterCount() != 0) continue;
-                if (Entity.class.isAssignableFrom(m.getReturnType())) {
-                    Object inner = m.invoke(emfEntity);
-                    if (inner instanceof Entity e) return e;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
     }
 }

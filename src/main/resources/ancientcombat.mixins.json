@@ -14,7 +14,8 @@
     "HumanoidModelNpcMixin",
     "LivingEntityRendererNpcMixin",
     "RenderNpcBaseMixin",
-    "ModelNpcMixin"
+    "ModelNpcMixin",
+    "PlayerModelNpcEmfCompatMixin"
   ],
   "injectors": {
     "defaultRequire": 1
