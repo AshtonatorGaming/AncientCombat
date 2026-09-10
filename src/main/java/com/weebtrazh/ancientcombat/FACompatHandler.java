@@ -25,23 +25,20 @@ public class FACompatHandler {
     private static final ThreadLocal<LivingEntity> EMF_NPC = new ThreadLocal<>();
 
     private static boolean resolved;
-    private static Method mpaIsAnimating;
     private static Method getCurrentEntity;
 
     public static void setEmfNpc(LivingEntity entity) {
-        EMF_NPC.set(entity);
+        if (entity == null) {
+            EMF_NPC.remove();
+        } else {
+            EMF_NPC.set(entity);
+        }
     }
 
     public static boolean shouldKeepCombatPose(LivingEntity entity) {
         if (!CompatConfig.ENABLE_EMF_NPC_COMPAT.get()) return false;
         if (entity instanceof Player) return false;
         if (!(entity instanceof NpcBase)) return false;
-        try {
-            if (mpaIsAnimating != null && Boolean.TRUE.equals(mpaIsAnimating.invoke(null, entity))) {
-                return true;
-            }
-        } catch (Throwable ignored) {
-        }
         return hasCombatAttributes(entity.getMainHandItem());
     }
 
@@ -57,16 +54,31 @@ public class FACompatHandler {
         }
     }
 
-    public static boolean currentEmfEntityNeedsCombatLock() {
-        LivingEntity local = EMF_NPC.get();
-        if (local != null && shouldKeepCombatPose(local)) return true;
-        if (getCurrentEntity == null) return false;
+    public static boolean needsTwoHandSnapshot(ItemStack stack) {
         try {
-            Entity e = unwrap(getCurrentEntity.invoke(null));
-            return e instanceof LivingEntity living && shouldKeepCombatPose(living);
+            WeaponAttributes attributes = WeaponRegistry.getAttributes(stack);
+            if (attributes == null) return false;
+            if (attributes.pose() != null) return true;
+            return attributes.isTwoHanded();
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    public static boolean currentEmfEntityNeedsCombatLock() {
+        if (getCurrentEntity != null) {
+            try {
+                Entity e = unwrap(getCurrentEntity.invoke(null));
+                if (e instanceof Player) return false;
+                if (e instanceof LivingEntity living) {
+                    return shouldKeepCombatPose(living);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        LivingEntity local = EMF_NPC.get();
+        if (local instanceof Player) return false;
+        return local instanceof NpcBase && shouldKeepCombatPose(local);
     }
 
     public static void captureForEmfCompat(PlayerModel<?> model, LivingEntity entity) {
@@ -140,11 +152,6 @@ public class FACompatHandler {
     private static void resolve() {
         if (resolved) return;
         resolved = true;
-        try {
-            Class<?> helper = Class.forName("me.Thelnfamous1.mobplayeranimator.api.PlayerAnimatorHelper");
-            mpaIsAnimating = helper.getMethod("isAnimating", LivingEntity.class);
-        } catch (Throwable ignored) {
-        }
         try {
             Class<?> api = Class.forName("traben.entity_model_features.EMFAnimationApi");
             getCurrentEntity = api.getMethod("getCurrentEntity");
