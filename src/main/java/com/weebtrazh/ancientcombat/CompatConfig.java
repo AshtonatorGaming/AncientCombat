@@ -47,19 +47,19 @@ public class CompatConfig {
                 .comment("If already in melee with a javelin/tomahawk/etc., use BC swings.")
                 .define("bcMeleeOnThrowableInRange", true);
         ENABLE_POSE_TICK = b
-                .comment("Client: tick BC pose updates on nearby AW NPCs.")
-                .define("enablePoseTick", true);
+                .comment("Off unless halberd idle is dead. Interval 1 fights PoseManager.")
+                .define("enablePoseTick", false);
         POSE_TICK_INTERVAL = b
-                .comment("Client ticks between pose scans.")
-                .defineInRange("poseTickInterval", 4, 1, 40);
+                .comment("1 = same as players. 4 hitchy.")
+                .defineInRange("poseTickInterval", 1, 1, 40);
         POSE_SCAN_RADIUS = b
                 .comment("Only update poses for NPCs within this distance of the player.")
                 .defineInRange("poseScanRadius", 48.0D, 16.0D, 128.0D);
         ENABLE_EMF_NPC_COMPAT = b
-                .comment("Client: when EMF is installed, keep FAPE/EMF body and idle on AW NPCs and let Better Combat own combat poses. No effect if EMF is not installed.")
+                .comment("Client: keep FAPE body on AW NPCs and let BC own combat arm poses.")
                 .define("enableEmfNpcCompat", true);
         EMF_PAUSE_ARMS_ONLY = b
-                .comment("If true, try to pause EMF only on arms during a combat pose. If false, pause the whole EMF animation on that NPC while a combat pose is active.")
+                .comment("Unused leftover. Safe to ignore.")
                 .define("emfPauseArmsOnly", true);
         b.pop();
 

@@ -15,7 +15,8 @@
     "LivingEntityRendererNpcMixin",
     "RenderNpcBaseMixin",
     "ModelNpcMixin",
-    "PlayerModelNpcEmfCompatMixin"
+    "PlayerModelNpcEmfCompatMixin",
+    "EmfCompatAnimationEndMixin"
   ],
   "injectors": {
     "defaultRequire": 1

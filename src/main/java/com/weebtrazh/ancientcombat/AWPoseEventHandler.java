@@ -38,12 +38,12 @@ public class AWPoseEventHandler {
 
         for (Entity entity : mc.level.getEntities(player, box, e -> e instanceof NpcBase)) {
             NpcBase npc = (NpcBase) entity;
-            // NpcBase already extends Mob — no instanceof Mob check
             if (!(npc instanceof PlayerAttackAnimatable animatable)) continue;
 
             ItemStack mainHand = npc.getMainHandItem();
             WeaponAttributes attributes = WeaponRegistry.getAttributes(mainHand);
-            if (attributes != null && attributes.pose() != null) {
+            if (attributes != null && (attributes.pose() != null
+                    || (mainHand.isEmpty() && attributes.attacks() != null && attributes.attacks().length > 0))) {
                 animatable.updateAnimationsOnTick();
             }
         }
