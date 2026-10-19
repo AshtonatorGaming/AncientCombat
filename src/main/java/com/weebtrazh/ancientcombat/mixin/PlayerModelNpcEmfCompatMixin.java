@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Marks the NPC EMF is currently posing so the FAPE arm gate can see the player animation stacks.
+ * Records which NPC is in {@code setupAnim}. Does not touch the shared Player Animator EMF variables.
  * The pose snapshot itself is {@link EmfPlayerModelNpcMixin}.
  */
 @Mixin(PlayerModel.class)
