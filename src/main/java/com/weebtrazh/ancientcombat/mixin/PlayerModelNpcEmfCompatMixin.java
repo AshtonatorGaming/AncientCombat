@@ -9,6 +9,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Priority 2502 so the RETURN inject runs after Player Animator (2000) and after
+ * EMF Compat's player capture (2500). The arm pose on the model at RETURN is the
+ * Better Combat swing or hold. NPCs are not {@code AbstractClientPlayer}, so the
+ * addon never snapshots them.
+ */
 @Mixin(value = PlayerModel.class, priority = 2502)
 public abstract class PlayerModelNpcEmfCompatMixin {
 
@@ -20,6 +26,15 @@ public abstract class PlayerModelNpcEmfCompatMixin {
             FACompatHandler.setEmfNpc(entity);
         } else {
             FACompatHandler.setEmfNpc(null);
+        }
+    }
+
+    @Inject(method = "setupAnim", at = @At("RETURN"))
+    private void ancientcombat$captureNpcPose(LivingEntity entity, float limbSwing, float limbSwingAmount,
+                                              float ageInTicks, float netHeadYaw, float headPitch,
+                                              CallbackInfo ci) {
+        if (entity instanceof NpcBase npc) {
+            FACompatHandler.captureNpcPose((PlayerModel<?>) (Object) this, npc, limbSwingAmount);
         }
     }
 }

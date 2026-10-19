@@ -24,8 +24,10 @@ public abstract class ModelNpcMixin {
     private void ancientcombat$zeroBeforeSuper(LivingEntity entity, float limbSwing, float limbSwingAmount,
                                                float ageInTicks, float netHeadYaw, float headPitch,
                                                CallbackInfo ci) {
-        if (!(entity instanceof NpcBase)) return;
-        if (!FACompatHandler.hasCombatAttributes(entity.getMainHandItem())) return;
+        if (!(entity instanceof NpcBase npc)) return;
+        // Armed, or an empty hand whose fist attributes Better Combat will animate.
+        // Leaves the vanilla swing in place when the item is not a Better Combat weapon.
+        if (!FACompatHandler.hasCombatAttributes(npc.getMainHandItem())) return;
         ((PlayerModel<?>) (Object) this).attackTime = 0.0F;
     }
 }
