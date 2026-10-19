@@ -17,7 +17,11 @@
     "RenderNpcBaseMixin",
     "ModelNpcMixin",
     "PlayerModelNpcEmfCompatMixin",
-    "EmfCompatAnimationEndMixin"
+    "PlayerModelNpcAnimatorMixin",
+    "NpcPlayerStackMixin",
+    "NpcPlayerTickMixin",
+    "EmfPlayerModelNpcMixin",
+    "PoseManagerNpcCleanupMixin"
   ],
   "injectors": {
     "defaultRequire": 1

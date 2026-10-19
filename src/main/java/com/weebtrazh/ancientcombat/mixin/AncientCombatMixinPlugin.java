@@ -25,11 +25,28 @@ public class AncientCombatMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.endsWith("EmfCompatAnimationEndMixin")) {
-            LoadingModList list = LoadingModList.get();
-            return list != null && list.getModFileById("emf_compat_core") != null;
+        LoadingModList list = LoadingModList.get();
+        if (mixinClassName.endsWith("PlayerModelNpcAnimatorMixin")) {
+            return loaded(list, "playeranimator");
+        }
+        if (mixinClassName.endsWith("EmfPlayerModelNpcMixin")) {
+            return loaded(list, "emf_compat_better_combat");
+        }
+        if (mixinClassName.endsWith("PoseManagerNpcCleanupMixin")) {
+            return loaded(list, "emf_compat_core");
+        }
+        // Better Mob Combat already puts the player stack on every mob. A second stack on NpcBase
+        // would register the same layers twice. Without it, NpcPlayerStackMixin is the player stack.
+        if (mixinClassName.endsWith("NpcPlayerStackMixin") || mixinClassName.endsWith("NpcPlayerTickMixin")) {
+            return loaded(list, "bettercombat")
+                    && loaded(list, "playeranimator")
+                    && !loaded(list, "bettermobcombat");
         }
         return true;
+    }
+
+    private static boolean loaded(LoadingModList list, String modId) {
+        return list != null && list.getModFileById(modId) != null;
     }
 
     @Override
